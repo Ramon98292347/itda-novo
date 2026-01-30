@@ -3,6 +3,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { FileText, Download, TrendingUp, Users, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/hooks/use-toast';
 
@@ -321,7 +322,7 @@ export const ReportsPage: React.FC = () => {
                       <th className="text-left p-4 font-semibold">Disciplina</th>
                       <th className="text-left p-4 font-semibold">Bimestre</th>
                       <th className="text-center p-4 font-semibold">Média</th>
-                      <th className="text-center p-4 font-semibold">Faltas</th>
+                      <th className="text-center p-4 font-semibold">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -336,8 +337,10 @@ export const ReportsPage: React.FC = () => {
                         <tr key={g.id} className="table-row">
                           <td className="p-4 font-medium text-foreground">{g.subjectName}</td>
                           <td className="p-4 text-muted-foreground">{g.bimesterName}</td>
-                          <td className="p-4 text-center">{Number(g.average).toFixed(1)}</td>
-                          <td className="p-4 text-center">{g.absences}</td>
+                          <td className="p-4 text-center">{Number(g.average ?? 0).toFixed(1)}</td>
+                          <td className="p-4 text-center">
+                            <StatusBadge status={g.status} />
+                          </td>
                         </tr>
                       ))
                     )}
