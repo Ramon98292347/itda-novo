@@ -409,10 +409,10 @@ export const TeacherGradesPage: React.FC = () => {
                   <thead>
                     <tr className="table-header">
                       <th className="text-left p-4 font-semibold">Aluno</th>
-                      <th className="text-center p-4 font-semibold w-24">Nota 1</th>
-                      <th className="text-center p-4 font-semibold w-24">Nota 2</th>
-                      <th className="text-center p-4 font-semibold w-24">Faltas</th>
-                      <th className="text-center p-4 font-semibold w-24">Média</th>
+                      <th className="text-center p-4 font-semibold w-24">Prova</th>
+                      <th className="text-center p-4 font-semibold w-24">Trabalho</th>
+                      {/*<th className="text-center p-4 font-semibold w-24">Faltas</th>*/}
+                      {/*<th className="text-center p-4 font-semibold w-24">Média</th>*/}
                       <th className="text-center p-4 font-semibold w-32">Situação</th>
                     </tr>
                   </thead>
@@ -433,7 +433,7 @@ export const TeacherGradesPage: React.FC = () => {
                             <input
                               type="number"
                               min="0"
-                              max="10"
+                              max="5"
                               step="0.1"
                               value={currentValues?.grade1 ?? gradeData.grade1}
                               onChange={(e) => handleGradeChange(student.id, 'grade1', e.target.value)}
@@ -444,7 +444,7 @@ export const TeacherGradesPage: React.FC = () => {
                             <input
                               type="number"
                               min="0"
-                              max="10"
+                              max="5"
                               step="0.1"
                               value={currentValues?.grade2 ?? gradeData.grade2}
                               onChange={(e) => handleGradeChange(student.id, 'grade2', e.target.value)}

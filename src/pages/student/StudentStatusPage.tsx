@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
+import { calculateStatus } from '@/data/mockData';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/hooks/use-toast';
 
@@ -95,9 +96,7 @@ export const StudentStatusPage: React.FC = () => {
 
   const finalStatus = useMemo(() => {
     if (finalAverageNumber == null) return null;
-    if (finalAverageNumber >= 7) return 'approved';
-    if (finalAverageNumber >= 5) return 'recovery';
-    return 'failed';
+    return calculateStatus(finalAverageNumber);
   }, [finalAverageNumber]);
 
   const finalAverage = finalAverageNumber != null ? finalAverageNumber.toFixed(1) : '-';
@@ -118,7 +117,7 @@ export const StudentStatusPage: React.FC = () => {
     return Array.from(bySubject.values())
       .map((s) => {
         const avg = s.count > 0 ? s.averageSum / s.count : 0;
-        const status = avg >= 7 ? 'approved' : avg >= 5 ? 'recovery' : 'failed';
+        const status = calculateStatus(avg);
         return { subjectId: s.subjectId, subjectName: s.subjectName, average: avg, absences: s.absences, status };
       })
       .sort((a, b) => a.subjectName.localeCompare(b.subjectName));

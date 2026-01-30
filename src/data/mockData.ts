@@ -62,8 +62,11 @@ export interface User {
 
 // Helper function to calculate status
 export const calculateStatus = (average: number): 'approved' | 'recovery' | 'failed' => {
-  if (average >= 7) return 'approved';
-  if (average >= 5) return 'recovery';
+  const normalized = Number.isFinite(average) ? average : 0;
+  const total = Math.round(normalized * 10) / 10;
+
+  if (total >= 5) return 'approved';
+  if (total >= 3) return 'recovery';
   return 'failed';
 };
 
