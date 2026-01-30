@@ -9,7 +9,7 @@ import { toast } from '@/hooks/use-toast';
 export const StudentAbsencesPage: React.FC = () => {
   const { user } = useAuth();
   const [studentId, setStudentId] = useState<string | null>(null);
-  const [grades, setGrades] = useState<Array<{ id: string; subjectName: string; bimesterName: string; absences: number }>>([]);
+  const [absences, setAbsences] = useState<Array<{ id: string; subjectName: string; bimesterName: string; absences: number }>>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -32,38 +32,51 @@ export const StudentAbsencesPage: React.FC = () => {
         if (!sid) {
           if (!cancelled) {
             setStudentId(null);
-            setGrades([]);
+            setAbsences([]);
           }
           return;
         }
 
-        const { data: gradesData, error: gradesErr } = await supabase
-          .from('grades')
-          .select('id,absences,subjects(name),bimesters(name)')
+        const { data: attendanceData, error: attendanceErr } = await supabase
+          .from('attendance')
+          .select('subject_id,bimester_id,subjects(name),bimesters(name),present')
           .eq('student_id', sid)
-          .order('created_at', { ascending: false });
+          .eq('present', false)
+          .order('date', { ascending: false });
 
-        if (gradesErr) throw gradesErr;
+        if (attendanceErr) throw attendanceErr;
 
-        const mapped = (gradesData ?? []).map((g: unknown) => {
-          const row = g as {
-            id: string;
-            absences: number | null;
-            subjects: { name: string } | null;
-            bimesters: { name: string } | null;
-          };
+        const byKey = new Map<string, { subjectName: string; bimesterName: string; absences: number }>();
+        for (const item of (attendanceData ?? []) as Array<{
+          subject_id: string;
+          bimester_id: string;
+          subjects: { name: string } | null;
+          bimesters: { name: string } | null;
+          present: boolean;
+        }>) {
+          const key = `${item.subject_id}:${item.bimester_id}`;
+          const prev = byKey.get(key);
+          if (prev) {
+            prev.absences += 1;
+          } else {
+            byKey.set(key, {
+              subjectName: item.subjects?.name ?? '-',
+              bimesterName: item.bimesters?.name ?? '-',
+              absences: 1,
+            });
+          }
+        }
 
-          return {
-            id: row.id,
-            subjectName: row.subjects?.name ?? '-',
-            bimesterName: row.bimesters?.name ?? '-',
-            absences: row.absences ?? 0,
-          };
-        });
+        const mapped = Array.from(byKey.entries()).map(([key, value]) => ({
+          id: key,
+          subjectName: value.subjectName,
+          bimesterName: value.bimesterName,
+          absences: value.absences,
+        }));
 
         if (!cancelled) {
           setStudentId(sid);
-          setGrades(mapped);
+          setAbsences(mapped);
         }
       } catch (err) {
         if (!cancelled) {
@@ -84,7 +97,7 @@ export const StudentAbsencesPage: React.FC = () => {
     };
   }, [user?.id]);
 
-  const totalAbsences = useMemo(() => grades.reduce((sum, g) => sum + (g.absences ?? 0), 0), [grades]);
+  const totalAbsences = useMemo(() => absences.reduce((sum, g) => sum + (g.absences ?? 0), 0), [absences]);
 
   return (
     <DashboardLayout allowedRoles={['student']}>
@@ -130,28 +143,28 @@ export const StudentAbsencesPage: React.FC = () => {
                     Aluno não encontrado.
                   </td>
                 </tr>
-              ) : grades.length === 0 ? (
+              ) : absences.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="p-8 text-center text-muted-foreground">
                     Nenhuma falta registrada.
                   </td>
                 </tr>
               ) : (
-                grades.map((grade) => (
-                  <tr key={grade.id} className="table-row">
-                    <td className="p-4 font-medium text-foreground">{grade.subjectName}</td>
-                    <td className="p-4 text-muted-foreground">{grade.bimesterName}</td>
+                absences.map((row) => (
+                  <tr key={row.id} className="table-row">
+                    <td className="p-4 font-medium text-foreground">{row.subjectName}</td>
+                    <td className="p-4 text-muted-foreground">{row.bimesterName}</td>
                     <td className="p-4 text-center">
                       <span
                         className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-medium ${
-                          grade.absences > 5
+                          row.absences > 5
                             ? 'bg-destructive/10 text-destructive'
-                            : grade.absences > 2
+                            : row.absences > 2
                             ? 'bg-warning/10 text-warning'
                             : 'bg-success/10 text-success'
                         }`}
                       >
-                        {grade.absences}
+                        {row.absences}
                       </span>
                     </td>
                   </tr>

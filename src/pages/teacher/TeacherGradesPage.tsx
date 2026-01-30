@@ -75,9 +75,13 @@ export const TeacherGradesPage: React.FC = () => {
         if (teacherErr) throw teacherErr;
         if (studentsErr) throw studentsErr;
 
-        const subject =
+        const teacherSubjects = (
           (teacherRow as { teacher_subjects: Array<{ subjects: { id: string; name: string; workload: number } | null }> | null } | null)
-            ?.teacher_subjects?.[0]?.subjects ?? null;
+            ?.teacher_subjects ?? []
+        )
+          .map((rel) => rel.subjects)
+          .filter((s): s is { id: string; name: string; workload: number } => Boolean(s))
+          .map((s) => ({ id: s.id, name: s.name, workload: s.workload }));
 
         const mappedStudents: StudentItem[] = (studentsData ?? []).map((row: unknown) => {
           const studentRow = row as {
@@ -104,7 +108,8 @@ export const TeacherGradesPage: React.FC = () => {
 
         if (!cancelled) {
           setStudents(mappedStudents);
-          setSubjects(subject ? [{ id: subject.id, name: subject.name, workload: subject.workload }] : []);
+          setSubjects(teacherSubjects);
+          setSelectedSubject((prev) => (teacherSubjects.some((s) => s.id === prev) ? prev : ''));
         }
       } catch (err) {
         if (!cancelled) {

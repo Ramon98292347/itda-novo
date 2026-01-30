@@ -29,12 +29,16 @@ export const TeacherSubjectsPage: React.FC = () => {
 
         if (error) throw error;
 
-        const subject =
+        const teacherSubjects = (
           (data as { teacher_subjects: Array<{ subjects: { id: string; name: string; workload: number } | null }> | null } | null)
-            ?.teacher_subjects?.[0]?.subjects ?? null;
+            ?.teacher_subjects ?? []
+        )
+          .map((rel) => rel.subjects)
+          .filter((s): s is { id: string; name: string; workload: number } => Boolean(s))
+          .map((s) => ({ id: s.id, name: s.name, workload: s.workload }));
 
         if (!cancelled) {
-          setSubjects(subject ? [{ id: subject.id, name: subject.name, workload: subject.workload }] : []);
+          setSubjects(teacherSubjects);
         }
       } catch (err) {
         if (!cancelled) {

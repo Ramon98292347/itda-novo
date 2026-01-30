@@ -9,7 +9,7 @@ import { toast } from '@/hooks/use-toast';
 export const TeacherDashboard: React.FC = () => {
   const { user } = useAuth();
   
-  const [teacher, setTeacher] = useState<{ name: string; email: string; subject?: { id: string; name: string; workload: number } } | null>(null);
+  const [teacher, setTeacher] = useState<{ name: string; email: string; subjects: Array<{ id: string; name: string; workload: number }> } | null>(null);
   const [bimesters, setBimesters] = useState<Array<{ id: string; name: string; startDate: string; endDate: string; status: 'active' | 'closed' }>>([]);
 
   useEffect(() => {
@@ -29,11 +29,15 @@ export const TeacherDashboard: React.FC = () => {
         if (teacherErr) throw teacherErr;
 
         const usersRow = (teacherRow as { users: { name: string; email: string } | null } | null)?.users ?? null;
-        const subjectRow =
+        const subjectsRow = (
           (teacherRow as { teacher_subjects: Array<{ subjects: { id: string; name: string; workload: number } | null }> | null } | null)
-            ?.teacher_subjects?.[0]?.subjects ?? null;
+            ?.teacher_subjects ?? []
+        )
+          .map((rel) => rel.subjects)
+          .filter((s): s is { id: string; name: string; workload: number } => Boolean(s));
+        const primarySubject = subjectsRow[0] ?? null;
 
-        if (!subjectRow || !usersRow) {
+        if (!primarySubject || !usersRow) {
           if (!cancelled) {
             setTeacher(null);
             setBimesters([]);
@@ -44,13 +48,13 @@ export const TeacherDashboard: React.FC = () => {
         const { data: bimestersData, error: bimestersErr } = await supabase
           .from('bimesters')
           .select('id,name,start_date,end_date,status')
-          .eq('subject_id', subjectRow.id)
+          .eq('subject_id', primarySubject.id)
           .order('start_date', { ascending: true });
 
         if (bimestersErr) throw bimestersErr;
 
         if (!cancelled) {
-          setTeacher({ name: usersRow.name, email: usersRow.email, subject: subjectRow });
+          setTeacher({ name: usersRow.name, email: usersRow.email, subjects: subjectsRow });
           setBimesters(
             (bimestersData ?? []).map((b) => ({
               id: b.id,
@@ -80,9 +84,16 @@ export const TeacherDashboard: React.FC = () => {
 
   const activeBimesters = bimesters.filter((b) => b.status === 'active');
 
+  const primarySubjectLabel = (() => {
+    const list = teacher?.subjects ?? [];
+    if (list.length === 0) return '-';
+    if (list.length === 1) return list[0].name;
+    return `${list[0].name} (+${list.length - 1})`;
+  })();
+
   const stats = [
-    { title: 'Minha Disciplina', value: teacher?.subject?.name || '-', icon: BookOpen, variant: 'primary' as const },
-    { title: 'Carga Horária', value: `${teacher?.subject?.workload || 0}h`, icon: Calendar, variant: 'secondary' as const },
+    { title: 'Minhas Disciplinas', value: primarySubjectLabel, icon: BookOpen, variant: 'primary' as const },
+    { title: 'Carga Horária', value: `${teacher?.subjects?.[0]?.workload || 0}h`, icon: Calendar, variant: 'secondary' as const },
     { title: 'Bimestres Ativos', value: activeBimesters.length, icon: ClipboardList, variant: 'accent' as const },
   ];
 
@@ -100,7 +111,7 @@ export const TeacherDashboard: React.FC = () => {
               <p className="text-muted-foreground">{teacher?.email || '-'}</p>
               <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/10 text-secondary text-sm font-medium">
                 <BookOpen size={16} />
-                {teacher?.subject?.name || '-'}
+                {primarySubjectLabel}
               </div>
             </div>
           </div>

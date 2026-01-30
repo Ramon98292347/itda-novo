@@ -10,7 +10,8 @@ import { toast } from '@/hooks/use-toast';
 
 export const TeacherBimestersPage: React.FC = () => {
   const { user } = useAuth();
-  const [subject, setSubject] = useState<{ id: string; name: string } | null>(null);
+  const [subjects, setSubjects] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [bimesters, setBimesters] = useState<Bimester[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -31,39 +32,17 @@ export const TeacherBimestersPage: React.FC = () => {
 
         if (teacherErr) throw teacherErr;
 
-        const subjectData =
+        const teacherSubjects = (
           (teacherRow as { teacher_subjects: Array<{ subjects: { id: string; name: string } | null }> | null } | null)
-            ?.teacher_subjects?.[0]?.subjects ?? null;
-
-        if (!subjectData) {
-          if (!cancelled) {
-            setSubject(null);
-            setBimesters([]);
-          }
-          return;
-        }
-
-        const { data: bimestersData, error: bimestersErr } = await supabase
-          .from('bimesters')
-          .select('id,name,subject_id,start_date,end_date,status')
-          .eq('subject_id', subjectData.id)
-          .order('start_date', { ascending: true });
-
-        if (bimestersErr) throw bimestersErr;
-
-        const mapped: Bimester[] = (bimestersData ?? []).map((row) => ({
-          id: row.id,
-          name: row.name,
-          subjectId: row.subject_id,
-          subjectName: subjectData.name,
-          startDate: row.start_date,
-          endDate: row.end_date,
-          status: row.status,
-        }));
+            ?.teacher_subjects ?? []
+        )
+          .map((rel) => rel.subjects)
+          .filter((s): s is { id: string; name: string } => Boolean(s))
+          .map((s) => ({ id: s.id, name: s.name }));
 
         if (!cancelled) {
-          setSubject(subjectData);
-          setBimesters(mapped);
+          setSubjects(teacherSubjects);
+          setSelectedSubjectId((prev) => (teacherSubjects.some((s) => s.id === prev) ? prev : teacherSubjects[0]?.id ?? ''));
         }
       } catch (err) {
         if (!cancelled) {
@@ -84,6 +63,52 @@ export const TeacherBimestersPage: React.FC = () => {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      setBimesters([]);
+      if (!selectedSubjectId) return;
+
+      try {
+        const selectedSubject = subjects.find((s) => s.id === selectedSubjectId);
+
+        const { data: bimestersData, error: bimestersErr } = await supabase
+          .from('bimesters')
+          .select('id,name,subject_id,start_date,end_date,status')
+          .eq('subject_id', selectedSubjectId)
+          .order('start_date', { ascending: true });
+
+        if (bimestersErr) throw bimestersErr;
+
+        const mapped: Bimester[] = (bimestersData ?? []).map((row) => ({
+          id: row.id,
+          name: row.name,
+          subjectId: row.subject_id,
+          subjectName: selectedSubject?.name,
+          startDate: row.start_date,
+          endDate: row.end_date,
+          status: row.status,
+        }));
+
+        if (!cancelled) setBimesters(mapped);
+      } catch (err) {
+        if (!cancelled) {
+          toast({
+            title: 'Erro',
+            description: 'Falha ao carregar bimestres do banco. Verifique as permissões (RLS).',
+            variant: 'destructive',
+          });
+        }
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSubjectId, subjects]);
+
   return (
     <DashboardLayout allowedRoles={['teacher']}>
       <PageHeader
@@ -94,15 +119,26 @@ export const TeacherBimestersPage: React.FC = () => {
       <div className="space-y-6">
         {isLoading ? (
           <div className="bg-card rounded-xl border border-border p-6 text-muted-foreground">Carregando...</div>
-        ) : !subject ? (
+        ) : subjects.length === 0 ? (
           <div className="bg-card rounded-xl border border-border p-6 text-muted-foreground">Nenhuma disciplina vinculada.</div>
         ) : (
-          <div key={subject.id} className="bg-card rounded-xl border border-border overflow-hidden">
-            <div className="p-4 border-b border-border bg-muted/30">
+          <div className="bg-card rounded-xl border border-border overflow-hidden">
+            <div className="p-4 border-b border-border bg-muted/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <h3 className="font-semibold text-foreground flex items-center gap-2">
                 <Calendar size={18} className="text-primary" />
-                {subject.name}
+                Bimestres por disciplina
               </h3>
+              <select
+                value={selectedSubjectId}
+                onChange={(e) => setSelectedSubjectId(e.target.value)}
+                className="form-input sm:max-w-[320px]"
+              >
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
             </div>
             
             {bimesters.length > 0 ? (

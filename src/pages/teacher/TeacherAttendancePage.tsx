@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Bimester, Student, Subject } from '@/data/mockData';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Save, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,6 +20,10 @@ export const TeacherAttendancePage: React.FC = () => {
   const [attendance, setAttendance] = useState<Record<string, boolean>>({});
   const [existingAttendance, setExistingAttendance] = useState<Record<string, AttendanceRow>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyStudentId, setHistoryStudentId] = useState('');
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyRows, setHistoryRows] = useState<Array<{ date: string; present: boolean; subjectName: string; bimesterName: string }>>([]);
 
   const formatSupabaseError = (err: unknown, fallback: string) => {
     if (err instanceof Error) {
@@ -73,9 +78,13 @@ export const TeacherAttendancePage: React.FC = () => {
         if (teacherErr) throw teacherErr;
         if (studentsErr) throw studentsErr;
 
-        const subject =
+        const teacherSubjects = (
           (teacherRow as { teacher_subjects: Array<{ subjects: { id: string; name: string; workload: number } | null }> | null } | null)
-            ?.teacher_subjects?.[0]?.subjects ?? null;
+            ?.teacher_subjects ?? []
+        )
+          .map((rel) => rel.subjects)
+          .filter((s): s is { id: string; name: string; workload: number } => Boolean(s))
+          .map((s) => ({ id: s.id, name: s.name, workload: s.workload }));
 
         const mappedStudents: StudentItem[] = (studentsData ?? []).map((row: unknown) => {
           const studentRow = row as {
@@ -101,7 +110,8 @@ export const TeacherAttendancePage: React.FC = () => {
         });
 
         if (!cancelled) {
-          setSubjects(subject ? [{ id: subject.id, name: subject.name, workload: subject.workload }] : []);
+          setSubjects(teacherSubjects);
+          setSelectedSubject((prev) => (teacherSubjects.some((s) => s.id === prev) ? prev : ''));
           setStudents(mappedStudents);
         }
       } catch (err) {
@@ -280,6 +290,57 @@ export const TeacherAttendancePage: React.FC = () => {
     })();
   };
 
+  const loadHistory = (studentId: string) => {
+    if (!studentId || !selectedSubject || !selectedBimester) return;
+
+    setHistoryLoading(true);
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('attendance')
+          .select('date,present,subjects(name),bimesters(name)')
+          .eq('student_id', studentId)
+          .eq('subject_id', selectedSubject)
+          .eq('bimester_id', selectedBimester)
+          .order('date', { ascending: false });
+
+        if (error) throw error;
+
+        const mapped = (data ?? []).map((row: unknown) => {
+          const item = row as {
+            date: string;
+            present: boolean;
+            subjects: { name: string } | null;
+            bimesters: { name: string } | null;
+          };
+
+          return {
+            date: item.date,
+            present: item.present,
+            subjectName: item.subjects?.name ?? '-',
+            bimesterName: item.bimesters?.name ?? '-',
+          };
+        });
+
+        setHistoryRows(mapped);
+      } catch (err) {
+        toast({
+          title: 'Erro',
+          description: formatSupabaseError(err, 'Falha ao carregar histórico de presenças.'),
+          variant: 'destructive',
+        });
+      } finally {
+        setHistoryLoading(false);
+      }
+    })();
+  };
+
+  const openHistory = (studentId: string) => {
+    setHistoryStudentId(studentId);
+    setIsHistoryOpen(true);
+    loadHistory(studentId);
+  };
+
   return (
     <DashboardLayout allowedRoles={['teacher']}>
       <PageHeader
@@ -362,9 +423,14 @@ export const TeacherAttendancePage: React.FC = () => {
                 })}
               </span>
             </p>
-            <Button variant="outline" onClick={markAllPresent}>
-              Marcar Todos Presentes
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button variant="outline" onClick={() => openHistory(historyStudentId || students[0]?.id || '')} disabled={!students.length}>
+                Ver Presenças
+              </Button>
+              <Button variant="outline" onClick={markAllPresent}>
+                Marcar Todos Presentes
+              </Button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -383,7 +449,9 @@ export const TeacherAttendancePage: React.FC = () => {
                   return (
                     <tr key={student.id} className="table-row">
                       <td className="p-4">
-                        <p className="font-medium text-foreground">{student.name}</p>
+                        <button type="button" onClick={() => openHistory(student.id)} className="text-left">
+                          <p className="font-medium text-foreground">{student.name}</p>
+                        </button>
                         <p className="text-sm text-muted-foreground">{student.email}</p>
                       </td>
                       <td className="p-4 text-muted-foreground">
@@ -437,6 +505,76 @@ export const TeacherAttendancePage: React.FC = () => {
           </p>
         </div>
       )}
+
+      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Presenças do aluno</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Aluno</label>
+                <select
+                  value={historyStudentId}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setHistoryStudentId(next);
+                    loadHistory(next);
+                  }}
+                  className="form-input"
+                >
+                  <option value="">Selecione um aluno</option>
+                  {students.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-muted/30 rounded-lg border border-border p-3">
+                <p className="text-sm text-muted-foreground">Filtros</p>
+                <p className="text-sm text-foreground mt-1">
+                  {subjects.find((s) => s.id === selectedSubject)?.name ?? '-'} /{' '}
+                  {filteredBimesters.find((b) => b.id === selectedBimester)?.name ?? '-'}
+                </p>
+              </div>
+            </div>
+
+            <div className="border border-border rounded-lg overflow-hidden">
+              <div className="grid grid-cols-3 bg-muted/30 text-sm font-medium text-foreground">
+                <div className="p-3">Data</div>
+                <div className="p-3">Bimestre</div>
+                <div className="p-3 text-right">Status</div>
+              </div>
+
+              {historyLoading ? (
+                <div className="p-6 text-center text-muted-foreground">Carregando...</div>
+              ) : historyStudentId && historyRows.length === 0 ? (
+                <div className="p-6 text-center text-muted-foreground">Nenhum registro encontrado.</div>
+              ) : (
+                historyRows.map((r) => (
+                  <div key={r.date} className="grid grid-cols-3 border-t border-border text-sm">
+                    <div className="p-3">{new Date(r.date).toLocaleDateString('pt-BR')}</div>
+                    <div className="p-3">{r.bimesterName}</div>
+                    <div className={`p-3 text-right font-medium ${r.present ? 'text-success' : 'text-destructive'}`}>
+                      {r.present ? 'Presente' : 'Ausente'}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsHistoryOpen(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };

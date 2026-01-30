@@ -8,8 +8,10 @@ import { Subject, Teacher } from '@/data/mockData';
 import { toast } from '@/hooks/use-toast';
 import { createAuthUserAsSecretary, supabase } from '@/lib/supabaseClient';
 
-interface TeacherItem extends Teacher {
+interface TeacherItem extends Omit<Teacher, 'subjectId' | 'subjectName'> {
   userId: string;
+  subjectIds: string[];
+  subjectNames?: string;
 }
 
 export const TeachersPage: React.FC = () => {
@@ -21,7 +23,7 @@ export const TeachersPage: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    subjectId: '',
+    subjectIds: [] as string[],
     password: '',
   });
 
@@ -65,8 +67,13 @@ export const TeachersPage: React.FC = () => {
       userId: row.user_id,
       name: row.users?.name ?? '',
       email: row.users?.email ?? '',
-      subjectId: row.teacher_subjects?.[0]?.subjects?.id ?? '',
-      subjectName: row.teacher_subjects?.[0]?.subjects?.name ?? undefined,
+      subjectIds: (row.teacher_subjects ?? [])
+        .map((rel) => rel.subjects?.id)
+        .filter((id): id is string => Boolean(id)),
+      subjectNames: (row.teacher_subjects ?? [])
+        .map((rel) => rel.subjects?.name)
+        .filter((name): name is string => Boolean(name))
+        .join(', ') || undefined,
     }));
 
     setTeachers(mapped);
@@ -75,7 +82,7 @@ export const TeachersPage: React.FC = () => {
   const columns = [
     { key: 'name' as const, header: 'Nome' },
     { key: 'email' as const, header: 'Email' },
-    { key: 'subjectName' as const, header: 'Disciplina' },
+    { key: 'subjectNames' as const, header: 'Disciplinas' },
     { key: 'actions' as const, header: 'Ações' },
   ];
 
@@ -112,12 +119,12 @@ export const TeachersPage: React.FC = () => {
       setFormData({
         name: teacher.name,
         email: teacher.email,
-        subjectId: teacher.subjectId,
+        subjectIds: teacher.subjectIds,
         password: '',
       });
     } else {
       setEditingTeacher(null);
-      setFormData({ name: '', email: '', subjectId: '', password: '' });
+      setFormData({ name: '', email: '', subjectIds: [], password: '' });
     }
     setIsModalOpen(true);
   };
@@ -125,7 +132,7 @@ export const TeachersPage: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.email || !formData.subjectId || (!editingTeacher && !formData.password)) {
+    if (!formData.name || !formData.email || formData.subjectIds.length === 0 || (!editingTeacher && !formData.password)) {
       toast({
         title: 'Erro',
         description: 'Por favor, preencha todos os campos.',
@@ -135,7 +142,7 @@ export const TeachersPage: React.FC = () => {
     }
 
     void (async () => {
-      const selectedSubject = subjects.find((s) => s.id === formData.subjectId);
+      const selectedSubjects = subjects.filter((s) => formData.subjectIds.includes(s.id));
 
       try {
         if (editingTeacher) {
@@ -160,13 +167,10 @@ export const TeachersPage: React.FC = () => {
               .delete()
               .eq('teacher_id', teacherData.id);
 
-            if (formData.subjectId) {
+            if (formData.subjectIds.length > 0) {
               const { error: subjectError } = await supabase
                 .from('teacher_subjects')
-                .insert({
-                  teacher_id: teacherData.id,
-                  subject_id: formData.subjectId,
-                });
+                .insert(formData.subjectIds.map((subjectId) => ({ teacher_id: teacherData.id, subject_id: subjectId })));
               if (subjectError) throw subjectError;
             }
           }
@@ -179,7 +183,7 @@ export const TeachersPage: React.FC = () => {
             email: formData.email,
             password: formData.password,
             role: 'teacher',
-            subjectId: formData.subjectId,
+            subjectId: formData.subjectIds[0],
           });
 
           const { error: insertUserErr } = await supabase
@@ -202,13 +206,13 @@ export const TeachersPage: React.FC = () => {
 
           const { error: relInsErr } = await supabase
             .from('teacher_subjects')
-            .insert({ teacher_id: teacherRow.id, subject_id: formData.subjectId });
+            .insert(formData.subjectIds.map((subjectId) => ({ teacher_id: teacherRow.id, subject_id: subjectId })));
           if (relInsErr) throw relInsErr;
 
           await loadTeachers();
           toast({
             title: 'Sucesso',
-            description: `Professor criado com sucesso.${selectedSubject?.name ? ` (${selectedSubject.name})` : ''}`,
+            description: `Professor criado com sucesso.${selectedSubjects.length ? ` (${selectedSubjects.map((s) => s.name).join(', ')})` : ''}`,
           });
         }
 
@@ -301,17 +305,20 @@ export const TeachersPage: React.FC = () => {
                 Disciplina
               </label>
               <select
-                value={formData.subjectId}
-                onChange={(e) => setFormData({ ...formData, subjectId: e.target.value })}
+                multiple
+                value={formData.subjectIds}
+                onChange={(e) => setFormData({ ...formData, subjectIds: Array.from(e.target.selectedOptions).map((o) => o.value) })}
                 className="form-input"
               >
-                <option value="">Selecione uma disciplina</option>
                 {subjects.map((subject) => (
                   <option key={subject.id} value={subject.id}>
                     {subject.name}
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-muted-foreground mt-2">
+                Segure Ctrl (Windows) ou Command (Mac) para selecionar mais de uma.
+              </p>
             </div>
 
             {!editingTeacher && (
