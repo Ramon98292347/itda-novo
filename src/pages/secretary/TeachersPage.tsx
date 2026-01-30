@@ -79,10 +79,23 @@ export const TeachersPage: React.FC = () => {
     setTeachers(mapped);
   };
 
+  // Responsivo: no mobile mostramos "Professor" com resumo e escondemos colunas secundárias.
   const columns = [
-    { key: 'name' as const, header: 'Nome' },
-    { key: 'email' as const, header: 'Email' },
-    { key: 'subjectNames' as const, header: 'Disciplinas' },
+    {
+      key: 'name' as const,
+      header: 'Professor',
+      render: (item: TeacherItem) => (
+        <div className="min-w-0">
+          <p className="font-medium text-foreground">{item.name}</p>
+          <div className="sm:hidden mt-1 space-y-0.5">
+            <p className="text-xs text-muted-foreground truncate">{item.email}</p>
+            <p className="text-xs text-muted-foreground truncate">{item.subjectNames ?? '-'}</p>
+          </div>
+        </div>
+      ),
+    },
+    { key: 'email' as const, header: 'Email', hideOnMobile: true, cellClassName: 'max-w-[260px] truncate' },
+    { key: 'subjectNames' as const, header: 'Disciplinas', hideOnMobile: true, cellClassName: 'max-w-[360px] truncate' },
     { key: 'actions' as const, header: 'Ações' },
   ];
 

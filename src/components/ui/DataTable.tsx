@@ -14,6 +14,11 @@ interface Column<T> {
   key: keyof T | 'actions';
   header: string;
   render?: (item: T) => React.ReactNode;
+  // Quando true, a coluna some no mobile e aparece a partir de sm (>=640px).
+  hideOnMobile?: boolean;
+  // Classes extras para ajustar responsividade/estilo por coluna.
+  headerClassName?: string;
+  cellClassName?: string;
 }
 
 interface DataTableProps<T> {
@@ -40,7 +45,14 @@ export function DataTable<T>({
           <TableHeader>
             <TableRow className="table-header">
               {columns.map((column) => (
-                <TableHead key={String(column.key)} className="font-semibold">
+                <TableHead
+                  key={String(column.key)}
+                  className={[
+                    'font-semibold',
+                    column.hideOnMobile ? 'hidden sm:table-cell' : '',
+                    column.headerClassName ?? '',
+                  ].filter(Boolean).join(' ')}
+                >
                   {column.header}
                 </TableHead>
               ))}
@@ -66,7 +78,13 @@ export function DataTable<T>({
               data.map((item) => (
                 <TableRow key={keyExtractor(item)} className="table-row">
                   {columns.map((column) => (
-                    <TableCell key={String(column.key)}>
+                    <TableCell
+                      key={String(column.key)}
+                      className={[
+                        column.hideOnMobile ? 'hidden sm:table-cell' : '',
+                        column.cellClassName ?? '',
+                      ].filter(Boolean).join(' ')}
+                    >
                       {column.key === 'actions' ? (
                         <div className="flex items-center gap-2">
                           {onEdit && (

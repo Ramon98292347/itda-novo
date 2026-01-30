@@ -99,15 +99,35 @@ export const StudentsPage: React.FC = () => {
     };
   }, []);
 
+  // Responsivo: no mobile mostramos "Aluno" com resumo e escondemos colunas secundárias.
   const columns = [
-    { key: 'name' as const, header: 'Nome' },
-    { key: 'email' as const, header: 'Email' },
-    { key: 'cpf' as const, header: 'CPF' },
-    { key: 'birthDate' as const, header: 'Data de Nascimento', render: (item: Student) => {
-      const date = new Date(item.birthDate);
-      return date.toLocaleDateString('pt-BR');
-    }},
-    { key: 'className' as const, header: 'Turma' },
+    {
+      key: 'name' as const,
+      header: 'Aluno',
+      render: (item: StudentItem) => (
+        <div className="min-w-0">
+          <p className="font-medium text-foreground">{item.name}</p>
+          <div className="sm:hidden mt-1 space-y-0.5">
+            <p className="text-xs text-muted-foreground truncate">{item.email}</p>
+            <p className="text-xs text-muted-foreground">
+              {item.className ?? '-'}
+            </p>
+          </div>
+        </div>
+      ),
+    },
+    { key: 'email' as const, header: 'Email', hideOnMobile: true, cellClassName: 'max-w-[260px] truncate' },
+    { key: 'cpf' as const, header: 'CPF', hideOnMobile: true },
+    {
+      key: 'birthDate' as const,
+      header: 'Nascimento',
+      hideOnMobile: true,
+      render: (item: Student) => {
+        const date = new Date(item.birthDate);
+        return date.toLocaleDateString('pt-BR');
+      },
+    },
+    { key: 'className' as const, header: 'Turma', hideOnMobile: true },
     { key: 'actions' as const, header: 'Ações' },
   ];
 

@@ -403,8 +403,9 @@ export const TeacherGradesPage: React.FC = () => {
             <div className="p-8 text-center text-muted-foreground">Carregando...</div>
           ) : (
             <>
+              {/* Responsivo: em telas pequenas, a tabela pode rolar horizontalmente. */}
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[720px]">
                   <thead>
                     <tr className="table-header">
                       <th className="text-left p-4 font-semibold">Aluno</th>

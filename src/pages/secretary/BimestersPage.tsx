@@ -60,20 +60,47 @@ export const BimestersPage: React.FC = () => {
     setBimesters(mapped);
   };
 
+  // Responsivo: no mobile o bimestre vira um card resumido na primeira coluna.
   const columns = [
-    { key: 'name' as const, header: 'Bimestre' },
-    { key: 'subjectName' as const, header: 'Disciplina' },
-    { key: 'startDate' as const, header: 'Início', render: (item: Bimester) => {
-      const date = new Date(item.startDate);
-      return date.toLocaleDateString('pt-BR');
-    }},
-    { key: 'endDate' as const, header: 'Fim', render: (item: Bimester) => {
-      const date = new Date(item.endDate);
-      return date.toLocaleDateString('pt-BR');
-    }},
-    { key: 'status' as const, header: 'Status', render: (item: Bimester) => (
-      <StatusBadge status={item.status} />
-    )},
+    {
+      key: 'name' as const,
+      header: 'Bimestre',
+      render: (item: Bimester) => (
+        <div className="min-w-0">
+          <p className="font-medium text-foreground">{item.name}</p>
+          <div className="sm:hidden mt-1 space-y-0.5">
+            <p className="text-xs text-muted-foreground truncate">{item.subjectName ?? '-'}</p>
+            <p className="text-xs text-muted-foreground">
+              {new Date(item.startDate).toLocaleDateString('pt-BR')} - {new Date(item.endDate).toLocaleDateString('pt-BR')}
+            </p>
+          </div>
+        </div>
+      ),
+    },
+    { key: 'subjectName' as const, header: 'Disciplina', hideOnMobile: true, cellClassName: 'max-w-[360px] truncate' },
+    {
+      key: 'startDate' as const,
+      header: 'Início',
+      hideOnMobile: true,
+      render: (item: Bimester) => {
+        const date = new Date(item.startDate);
+        return date.toLocaleDateString('pt-BR');
+      },
+    },
+    {
+      key: 'endDate' as const,
+      header: 'Fim',
+      hideOnMobile: true,
+      render: (item: Bimester) => {
+        const date = new Date(item.endDate);
+        return date.toLocaleDateString('pt-BR');
+      },
+    },
+    {
+      key: 'status' as const,
+      header: 'Status',
+      render: (item: Bimester) => <StatusBadge status={item.status} />,
+    },
     { key: 'actions' as const, header: 'Ações' },
   ];
 
@@ -254,7 +281,7 @@ export const BimestersPage: React.FC = () => {
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
                   Data de Início
